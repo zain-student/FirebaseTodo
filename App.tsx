@@ -1,10 +1,20 @@
 import { StatusBar } from "expo-status-bar";
-import { collection, Timestamp } from "firebase/firestore";
 import { db } from "./firebase";
-import { useState } from "react";
-import { addDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import {
+  query,
+  orderBy,
+  addDoc,
+  getDocs,
+  collection,
+  onSnapshot,
+  Timestamp,
+  updateDoc,
+  doc,
+} from "firebase/firestore";
 import {
   Alert,
+  FlatList,
   StyleSheet,
   Text,
   TextInput,
@@ -23,7 +33,45 @@ export default function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(true);
-  const todosCollection = collection(db, "todos ");
+  const todosCollection = collection(db, "todos");
+  const toggleTodoCompletion = async (id: string) => {
+    const todoDoc = todos.find((todo) => todo.id === id);
+
+    if (!todoDoc) {
+      Alert.alert("Error", "Todo not found");
+      return;
+    }
+
+    try {
+      const todoRef = doc(db, "todos", id);
+
+      await updateDoc(todoRef, {
+        completed: !todoDoc.completed,
+      });
+    } catch (error) {
+      Alert.alert("Error", "Failed to update todo");
+      console.error("Error updating todo:", error);
+    }
+  };
+  useEffect(() => {
+    const q = query(todosCollection, orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const todosData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })) as Todo[];
+        setTodos(todosData);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching todos:", error);
+        setLoading(false);
+      },
+    );
+    return () => unsubscribe();
+  }, []);
   const createTodo = async () => {
     if (inputText.trim() === "") {
       Alert.alert("Error", "Please enter a todo");
@@ -33,11 +81,11 @@ export default function App() {
       await addDoc(todosCollection, {
         text: inputText.trim(),
         completed: false,
-        createdAt: Date.now(),
+        createdAt: Timestamp.now(),
       });
       setInputText("");
     } catch (error) {
-      Alert.alert("Error", "Failed to create todo"); 
+      Alert.alert("Error", "Failed to create todo");
       console.error("Error creating todo:", error);
     }
   };
@@ -60,6 +108,79 @@ export default function App() {
           <Text style={styles.addButtonText}>Add</Text>
         </TouchableOpacity>
       </View>
+      <Text>Todos:</Text>
+      {loading ? (
+        <Text>Loading...</Text>
+      ) : todos.length === 0 ? (
+        <Text>No todos found</Text>
+      ) : (
+        <FlatList
+          data={todos}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <View
+              style={{
+                padding: 10,
+                borderBottomWidth: 1,
+                borderBottomColor: "#ccc",
+                backgroundColor: "lightgray",
+                flex: 1,
+                marginBottom: 10,
+                borderRadius: 10,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text>{item.text}</Text>
+                {/* <Text>{item.createdAt.toDate().toLocaleString()}</Text> */}
+
+                <Text
+                  style={{
+                    color: item.completed ? "green" : "red",
+                    paddingVertical: 1,
+                    borderRadius: 19,
+                    backgroundColor: item.completed
+                      ? "lightgreen"
+                      : "lightcoral",
+                    textAlign: "center",
+                    width: 120,
+                  }}
+                >
+                  {item.completed ? "Completed" : "Not Completed"}
+                </Text>
+              </View>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                }}
+              >
+                <Text style={{ fontSize: 12, color: "#666", marginTop: 5 }}>
+                  {item.createdAt instanceof Timestamp
+                    ? item.createdAt.toDate().toLocaleString()
+                    : "Unknown"}
+                </Text>
+                {item.completed ? null : (
+                  <TouchableOpacity
+                    style={{
+                      padding: 5,
+                      backgroundColor: "lightblue",
+                      borderRadius: 5,
+                    }}
+                    onPress={() => toggleTodoCompletion(item.id)}
+                  >
+                    <Text>Complete</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -68,8 +189,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    alignItems: "center",
-    paddingHorizontal: 20,
+    // alignItems: "center",
+    paddingHorizontal: 12,
     paddingTop: 50,
     // justifyContent: "center",
   },
