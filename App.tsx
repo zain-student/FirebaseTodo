@@ -11,6 +11,7 @@ import {
   Timestamp,
   updateDoc,
   doc,
+  deleteDoc,
 } from "firebase/firestore";
 import {
   Alert,
@@ -51,6 +52,15 @@ export default function App() {
     } catch (error) {
       Alert.alert("Error", "Failed to update todo");
       console.error("Error updating todo:", error);
+    }
+  };
+  const deleteTodo = async (id: string) => {
+    try {
+      const todoRef = doc(db, "todos", id);
+      await deleteDoc(todoRef);
+    } catch (error) {
+      Alert.alert("Error", "Failed to delete todo");
+      console.error("Error deleting todo:", error);
     }
   };
   useEffect(() => {
@@ -110,9 +120,9 @@ export default function App() {
       </View>
       <Text>Todos:</Text>
       {loading ? (
-        <Text>Loading...</Text>
+        <Text style={styles.loadingText}>Loading...</Text>
       ) : todos.length === 0 ? (
-        <Text>No todos found</Text>
+        <Text style={styles.noTodosText}>No todos found</Text>
       ) : (
         <FlatList
           data={todos}
@@ -164,12 +174,27 @@ export default function App() {
                     ? item.createdAt.toDate().toLocaleString()
                     : "Unknown"}
                 </Text>
-                {item.completed ? null : (
+                {item.completed ? (
+                  <TouchableOpacity
+                    style={{
+                      padding: 5,
+                      backgroundColor: "red",
+                      borderRadius: 5,
+                      marginTop: 5,
+                      paddingHorizontal: 10,
+                    }}
+                    onPress={() => deleteTodo(item.id)}
+                  >
+                    <Text>Delete</Text>
+                  </TouchableOpacity>
+                ) : (
                   <TouchableOpacity
                     style={{
                       padding: 5,
                       backgroundColor: "lightblue",
                       borderRadius: 5,
+                      marginTop: 5,
+                      paddingHorizontal: 10,
                     }}
                     onPress={() => toggleTodoCompletion(item.id)}
                   >
@@ -206,6 +231,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 20,
+  },
+  noTodosText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginTop: 20,
   },
   input: {
     flex: 1,
